@@ -30,13 +30,13 @@ print('connecting to %s port ' + str(server_address))
 s.connect(server_address)
 
 try:
-    my_payload = struct.pack(">IB", 4, 1)
+    p = Protocol()
+    my_payload = p.send_handshake(s, "12345678", "1234546")
 
-    hi = my_payload + ("Hel").encode("utf-8")
+    msg_type, payload = Protocol.recv(s)
 
-    s.sendall(hi)
+    a = Protocol.parse_piece(payload)
 
-    data = s.recv(1024)
-    print('Server: ', len(data), data.decode("utf8"))
+    print(a)
 finally:
     s.close()

@@ -60,7 +60,7 @@ class PeerServer:
 
             logger.d(f"client recv: {msg_type} - {payload}")
 
-            Protocol.send(sock, 5, "PTITTTTTTT".encode("utf-8"))
+            Protocol.send_piece(sock, 99, "PTITTTTTTT".encode("utf-8"))
         except Exception as e:
             logger.e(f"error: {e}")
             Protocol.raw_send(sock, f"error {e}".encode("utf-8"))
