@@ -19,6 +19,21 @@ class Metadata:
         self.piece_hashes = piece_hashes
         self.tracker_url = tracker_url
 
+    @staticmethod
+    def from_file(file_path: str) -> 'Metadata':
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return Metadata(
+            file_id=data["file_id"],
+            file_name=data["file_name"],
+            file_size=data["file_size"],
+            piece_size=data["piece_size"],
+            total_pieces=data["total_pieces"],
+            file_hash=data["file_hash"],
+            piece_hashes=data["piece_hashes"],
+            tracker_url=data["tracker_url"]
+        )
+
     def to_dict(self):
         return {
             "file_id": self.file_hash,
@@ -87,7 +102,8 @@ class Chunker:
 
         return metadata
 
-    def read_piece_by_index(self, file_path: str, piece_index: int, piece_size: int) -> bytes:
+    @staticmethod
+    def read_piece_by_index(file_path: str, piece_index: int, piece_size: int) -> bytes:
         if not os.path.exists(file_path):
             raise Exception(f"File not found: {file_path}")
 
