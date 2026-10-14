@@ -20,7 +20,7 @@ class Tracker:
             "file_hash": metadata.file_hash
         }
         try:
-            resp = requests.post(url, json=payload)
+            resp = requests.post(url, json=payload, timeout=15)
             resp.raise_for_status()
             data = resp.json()
             return data.get("status") == "success"
@@ -42,8 +42,7 @@ class Tracker:
         ip: Optional[str] = None
     ) -> dict[str, Any]:
         """
-        Gửi báo cáo trạng thái lên Tracker và nhận về danh sách các Peer trong Swarm.
-        Sự kiện hỗ trợ: 'started', 'completed', 'stopped', '' (heartbeat).
+        'started', 'completed', 'stopped', ''.
         """
         url = f"{self.base_url}/announce.php"
         payload = {
@@ -60,7 +59,7 @@ class Tracker:
             payload["ip"] = ip
 
         try:
-            resp = requests.post(url, json=payload, timeout=self.timeout)
+            resp = requests.post(url, json=payload, timeout=15)
             resp.raise_for_status()
             result = resp.json()
 

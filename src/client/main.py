@@ -1,5 +1,8 @@
-from utils.log import logger
-from core.chunker import Chunker
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from client.utils.log import logger
+from client.core.chunker import Chunker
 
 logger.i("Hello world")
 
