@@ -26,6 +26,7 @@ from client.utils.log import logger
 DEFAULT_TRACKER_URL = "https://nth.io.vn"
 DEFAULT_PORT = 6881  # cổng chuẩn BitTorrent
 SESSION_FILE = "session.json"
+ADVERTISE_IP_ENV = "PTORRENT_ADVERTISE_IP"  # IP báo tracker thay cho IP tracker tự thấy
 MAX_ANNOUNCE_INTERVAL = 30.0  # giây
 
 
@@ -80,6 +81,9 @@ class TorrentManager:
     """Giữ danh sách TorrentTask và dùng chung MỘT PeerServer (một cổng TCP).
 
     default_port=0: hệ điều hành tự chọn cổng (dùng khi test).
+    advertise_ip: IP gửi kèm mỗi lần báo tracker, để demo trong cùng mạng LAN (tracker
+    chỉ thấy IP công khai). Bỏ trống thì đọc biến môi trường PTORRENT_ADVERTISE_IP;
+    vẫn trống thì tracker tự lấy IP của kết nối.
     """
 
     def __init__(
@@ -87,6 +91,7 @@ class TorrentManager:
         storage_root: str,
         default_port: int = DEFAULT_PORT,
         tracker_url: str = DEFAULT_TRACKER_URL,
+        advertise_ip: Optional[str] = None,
     ):
         self.storage_root = os.path.abspath(storage_root)
         self.torrents_dir = os.path.join(self.storage_root, "torrents")
@@ -94,6 +99,7 @@ class TorrentManager:
 
         self.tracker_url = normalize_tracker_url(tracker_url)
         self.tracker = Tracker(self.tracker_url)
+        self.advertise_ip = (advertise_ip or os.environ.get(ADVERTISE_IP_ENV, "")).strip() or None
 
         self.peer_id = self._load_or_create_peer_id()
         self.server = PeerServer(self.peer_id, "0.0.0.0", default_port)
@@ -138,16 +144,29 @@ class TorrentManager:
             self._stop_event = threading.Event()
             self._announce_now.clear()
             bus.subscribe("file.completed", self._on_file_completed)
-            self._threads = [
-                threading.Thread(target=self._announce_loop, args=(self._stop_event,),
-                                 daemon=True, name="tm-announce"),
-                threading.Thread(target=self._speed_loop, args=(self._stop_event,),
-                                 daemon=True, name="tm-speed"),
-            ]
-            for t in self._threads:
-                t.start()
+            announce = threading.Thread(target=self._announce_loop, args=(self._stop_event,),
+                                        daemon=True, name="tm-announce")
+            self._threads = [announce]
+            announce.start()
+            self.start_speed_calculator_loop()
         atexit.register(self.shutdown)
         logger.i(f"TorrentManager started: peer_id={self.peer_id} port={self.port}")
+
+    def start_speed_calculator_loop(self) -> None:
+        """Bật vòng tính tốc độ mỗi giây (task.speed, task.progress). Gọi nhiều lần không sao.
+
+        start() đã tự gọi hàm này; nếu manager chưa chạy thì hàm này gọi start() luôn.
+        """
+        with self._lock:
+            if not self._running:
+                self.start()  # start() sẽ gọi lại hàm này khi đã đặt _running
+                return
+            if any(t.name == "tm-speed" and t.is_alive() for t in self._threads):
+                return
+            speed = threading.Thread(target=self._speed_loop, args=(self._stop_event,),
+                                     daemon=True, name="tm-speed")
+            self._threads.append(speed)
+            speed.start()
 
     def stop(self) -> None:
         """Tắt vòng nền và đóng cổng TCP. Gọi nhiều lần không sao."""
@@ -505,6 +524,7 @@ class TorrentManager:
                 bytes_left=pm.get_bytes_left(),
                 event=event,
                 bitfield=pm.get_bitfield(),
+                ip=self.advertise_ip,
             )
         except Exception as e:
             logger.e(f"announce failed for {task.metadata.file_name}: {e}")
