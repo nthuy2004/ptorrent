@@ -20,3 +20,9 @@ Desktop.ini
 $RECYCLE.BIN/
 System Volume Information
 *.lnk
+
+# Dữ liệu chạy của ứng dụng (chunk, file đã tải)
+storage/
+chunks/
+completed/
+*.dat
