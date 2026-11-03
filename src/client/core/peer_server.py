@@ -49,6 +49,21 @@ class PeerServer:
             if piece_manager.file_id not in self._active_clients:
                 self._active_clients[piece_manager.file_id] = []
 
+    def unregister_torrent(self, file_id: str) -> None:
+        with self._lock:
+            self._piece_managers.pop(file_id, None)
+            clients = self._active_clients.pop(file_id, [])
+
+        for sock in clients:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                sock.close()
+            except OSError:
+                pass
+
     def start(self):
         if self._running:
             return

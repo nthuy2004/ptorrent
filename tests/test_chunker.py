@@ -46,7 +46,7 @@ def test_chunker_lifecycle():
     meta_path = os.path.join(temp_dir, "sample.meta.json")
     tracker_url = "http://127.0.0.1:8080/announce.php"
 
-    meta = Chunker.create_metadata(sample_file, tracker_url, piece_size, meta_path)
+    meta = Chunker().create_metadata(sample_file, tracker_url, piece_size, meta_path).to_dict()
     total_pieces = meta["total_pieces"]
 
     print(f"[OK] Metadata được sinh thành công:")
