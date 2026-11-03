@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 
-from PyQt6.QtCore import QCoreApplication, QObject, QThread, pyqtSlot
+from PyQt6.QtCore import QObject, QThread, pyqtSlot
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
@@ -23,8 +23,7 @@ class _ChunkReceiver(QObject):
         self.delivery_thread = QThread.currentThread()
 
 
-def test_chunk_event_from_worker_is_delivered_on_qt_thread():
-    app = QCoreApplication.instance() or QCoreApplication([])
+def test_chunk_event_from_worker_is_delivered_on_qt_thread(qapp):
     bridge = QtEventBridge()
     receiver = _ChunkReceiver()
     bridge.sig_chunk_updated.connect(receiver.receive)
@@ -42,17 +41,16 @@ def test_chunk_event_from_worker_is_delivered_on_qt_thread():
 
         deadline = time.monotonic() + 2
         while not receiver.events and time.monotonic() < deadline:
-            app.processEvents()
+            qapp.processEvents()
             time.sleep(0.005)
 
         assert receiver.events == [("demo-file", 2, "completed")]
-        assert receiver.delivery_thread == app.thread()
+        assert receiver.delivery_thread == qapp.thread()
     finally:
         bridge.close()
 
 
-def test_bridge_maps_task_and_peer_events():
-    app = QCoreApplication.instance() or QCoreApplication([])
+def test_bridge_maps_task_and_peer_events(qapp):
     bridge = QtEventBridge()
     chunks = []
     progress = []
@@ -74,7 +72,7 @@ def test_bridge_maps_task_and_peer_events():
         bus.publish("file.completed", {"file_id": "f1", "output_path": "out.bin"})
         bus.publish("peer.connected", {"peer_id": "peer-a", "ip": "127.0.0.1", "port": 6767})
 
-        app.processEvents()
+        qapp.processEvents()
 
         assert chunks == [("f1", 0, "downloading"), ("f1", 1, "corrupted")]
         assert progress == [("f1", 10, 20)]
@@ -85,14 +83,13 @@ def test_bridge_maps_task_and_peer_events():
         bridge.close()
 
 
-def test_close_unsubscribes_bridge_from_event_bus():
-    app = QCoreApplication.instance() or QCoreApplication([])
+def test_close_unsubscribes_bridge_from_event_bus(qapp):
     bridge = QtEventBridge()
     events = []
     bridge.sig_chunk_updated.connect(lambda *args: events.append(args))
 
     bridge.close()
     bus.publish("chunk.completed", {"file_id": "f1", "index": 3})
-    app.processEvents()
+    qapp.processEvents()
 
     assert events == []
