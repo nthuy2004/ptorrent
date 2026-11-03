@@ -134,7 +134,7 @@ class FakeTracker:
                  event="", bitfield=None, ip=None):
         self.announces.append({"file_id": file_id, "port": port, "uploaded": uploaded,
                                "downloaded": downloaded, "bytes_left": bytes_left,
-                               "event": event})
+                               "event": event, "ip": ip})
         return {"interval": 1, "complete": 0, "incomplete": 0, "peers": list(self.peers)}
 
     def events(self):
@@ -365,6 +365,27 @@ def test_two_managers_transfer_a_file(tmp_path, managers):
     assert wait_for(lambda: seed.piece_manager.uploaded_bytes >= seed.metadata.file_size)
 
 
+def test_two_files_download_at_the_same_time(tmp_path, managers):
+    """Một leecher tải 2 file cùng lúc từ một seeder; hai task không lẫn nhau."""
+    seeder = make_manager(tmp_path, "seeder", register=managers)
+    src_a = write_source(tmp_path, "a.bin", size=12 * PIECE + 5)
+    src_b = write_source(tmp_path, "b.bin", size=9 * PIECE + 77)
+    seed_a = seeder.create_and_seed(src_a, piece_size=PIECE)
+    seed_b = seeder.create_and_seed(src_b, piece_size=PIECE)
+    peers = [{"ip": "127.0.0.1", "port": seeder.port, "peer_id": seeder.peer_id}]
+    leecher = make_manager(tmp_path, "leecher", tracker=FakeTracker(peers), register=managers)
+
+    task_a = leecher.add_torrent(seed_a.meta_path)
+    task_b = leecher.add_torrent(seed_b.meta_path)
+    assert wait_for(lambda: task_a.status == "completed" and task_b.status == "completed")
+
+    for task, src in ((task_a, src_a), (task_b, src_b)):
+        with open(task.piece_manager.completed_file_path, "rb") as got, open(src, "rb") as want:
+            assert got.read() == want.read()
+    assert len(leecher.get_all_tasks()) == 2
+    assert leecher.server is not None and leecher.port == leecher.server.port  # chỉ một cổng
+
+
 # --- pause / resume / remove ---
 def add_idle_leecher(tmp_path, managers):
     """Leecher không có peer nào để tải: dừng ở trạng thái downloading."""
@@ -529,6 +550,63 @@ def test_speed_loop_publishes_by_itself(tmp_path, managers):
         assert wait_for(lambda: len(got) >= 2, timeout=5)
     finally:
         bus.unsubscribe("task.progress", on_progress)
+
+
+# --- advertise_ip ---
+def test_advertise_ip_is_sent_to_tracker(tmp_path, managers, monkeypatch):
+    monkeypatch.delenv("PTORRENT_ADVERTISE_IP", raising=False)
+    m = make_manager(tmp_path, register=managers)
+    m.advertise_ip = "192.168.1.50"
+    m.create_and_seed(write_source(tmp_path), piece_size=PIECE)
+    assert m.tracker.announces and all(a["ip"] == "192.168.1.50" for a in m.tracker.announces)
+
+
+def test_no_advertise_ip_by_default(tmp_path, managers, monkeypatch):
+    monkeypatch.delenv("PTORRENT_ADVERTISE_IP", raising=False)
+    m = TorrentManager(str(tmp_path / "s"), default_port=0, tracker_url="http://x")
+    assert m.advertise_ip is None
+    m = make_manager(tmp_path, register=managers)
+    m.create_and_seed(write_source(tmp_path), piece_size=PIECE)
+    assert m.tracker.announces and all(a["ip"] is None for a in m.tracker.announces)
+
+
+def test_advertise_ip_from_argument_or_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("PTORRENT_ADVERTISE_IP", "  10.0.0.7 ")
+    m = TorrentManager(str(tmp_path / "a"), default_port=0, tracker_url="http://x")
+    assert m.advertise_ip == "10.0.0.7"
+    m = TorrentManager(str(tmp_path / "b"), default_port=0, tracker_url="http://x",
+                       advertise_ip="192.168.1.9")
+    assert m.advertise_ip == "192.168.1.9"  # tham số thắng biến môi trường
+    monkeypatch.setenv("PTORRENT_ADVERTISE_IP", "   ")
+    m = TorrentManager(str(tmp_path / "c"), default_port=0, tracker_url="http://x")
+    assert m.advertise_ip is None
+
+
+def test_advertise_ip_is_also_sent_when_stopping(tmp_path, managers, monkeypatch):
+    monkeypatch.delenv("PTORRENT_ADVERTISE_IP", raising=False)
+    m = make_manager(tmp_path, register=managers)
+    m.advertise_ip = "192.168.1.50"
+    m.create_and_seed(write_source(tmp_path), piece_size=PIECE)
+    m.shutdown()
+    stopped = [a for a in m.tracker.announces if a["event"] == "stopped"]
+    assert stopped and stopped[-1]["ip"] == "192.168.1.50"
+
+
+def test_start_speed_calculator_loop_is_idempotent(tmp_path, managers):
+    m = make_manager(tmp_path, register=managers)
+    m.start()
+    m.start_speed_calculator_loop()
+    m.start_speed_calculator_loop()
+    assert [t.name for t in m._threads].count("tm-speed") == 1
+
+
+def test_start_speed_calculator_loop_starts_a_stopped_manager(tmp_path, managers):
+    m = make_manager(tmp_path, register=managers)
+    assert not m.is_running
+    m.start_speed_calculator_loop()
+    assert m.is_running
+    assert [t.name for t in m._threads].count("tm-speed") == 1
+    assert all(t.is_alive() for t in m._threads)
 
 
 def test_announce_round_sends_pending_event_once(tmp_path, managers):
