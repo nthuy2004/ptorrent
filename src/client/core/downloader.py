@@ -61,21 +61,65 @@ class Downloader:
         peer_label = f"{remote_peer_id} ({ip}:{port})"
         sock: Optional[socket.socket] = None
         current_piece: Optional[int] = None
+        handshake_started = False
+        handshake_succeeded = False
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(self.socket_timeout)
             sock.connect(peer_addr)
 
+            handshake_started = True
+            bus.publish("peer.handshake.started", {
+                "peer_id": remote_peer_id,
+                "ip": ip,
+                "port": port,
+                "direction": "outgoing",
+            })
             Protocol.send_handshake(sock, self.pm.file_id, self.peer_id, is_ack=False)
 
             msg_type, payload = Protocol.recv(sock)
             if msg_type != Protocol.MSG_HANDSHAKE_OK:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": remote_peer_id,
+                    "ip": ip,
+                    "port": port,
+                    "direction": "outgoing",
+                    "reason": f"expected handshake ACK, received message type {msg_type}",
+                })
                 return
 
-            hs_ack = Protocol.parse_handshake(payload)
+            try:
+                hs_ack = Protocol.parse_handshake(payload)
+            except (ValueError, UnicodeError) as exc:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": remote_peer_id,
+                    "ip": ip,
+                    "port": port,
+                    "direction": "outgoing",
+                    "reason": f"invalid handshake ACK: {exc}",
+                })
+                return
+
+            if hs_ack.get("file_id") != self.pm.file_id:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": remote_peer_id,
+                    "ip": ip,
+                    "port": port,
+                    "direction": "outgoing",
+                    "reason": "handshake ACK has a different file ID",
+                })
+                return
+
             remote_peer_id = hs_ack.get("peer_id", remote_peer_id)
             peer_label = f"{remote_peer_id} ({ip}:{port})"
+            handshake_succeeded = True
+            bus.publish("peer.handshake.succeeded", {
+                "peer_id": remote_peer_id,
+                "ip": ip,
+                "port": port,
+                "direction": "outgoing",
+            })
 
             msg_type, payload = Protocol.recv(sock)
             if msg_type != Protocol.MSG_BITFIELD:
@@ -139,7 +183,15 @@ class Downloader:
                     else:
                         raise ConnectionError("Gói tin không hợp lệ hoặc kết nối đã đóng.")
 
-        except (ConnectionError, socket.timeout, OSError):
+        except (ConnectionError, socket.timeout, OSError, ValueError) as exc:
+            if handshake_started and not handshake_succeeded:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": remote_peer_id,
+                    "ip": ip,
+                    "port": port,
+                    "direction": "outgoing",
+                    "reason": str(exc) or exc.__class__.__name__,
+                })
             if current_piece is not None:
                 self.pm.switch_piece_to_pending(current_piece)
                 current_piece = None

@@ -27,6 +27,9 @@ class QtEventBridge(QObject):
         self._subscribe("file.completed", self._on_file_completed)
         self._subscribe("task.progress", self._on_progress)
         self._subscribe("task.speed", self._on_speed)
+        self._subscribe("peer.handshake.started", self._on_handshake_started)
+        self._subscribe("peer.handshake.succeeded", self._on_handshake_succeeded)
+        self._subscribe("peer.handshake.failed", self._on_handshake_failed)
         self._subscribe("peer.connected", self._on_peer_connected)
         self._subscribe("peer.disconnected", self._on_peer_disconnected)
 
@@ -92,3 +95,24 @@ class QtEventBridge(QObject):
         port = data.get("port")
         endpoint = f" ({address}:{port})" if address is not None and port is not None else ""
         self.sig_log_message.emit("INFO", f"Peer {peer_id}{endpoint} {state}")
+
+    def _on_handshake_started(self, data: dict | None = None) -> None:
+        self._emit_handshake_log(data or {}, "started", "INFO")
+
+    def _on_handshake_succeeded(self, data: dict | None = None) -> None:
+        self._emit_handshake_log(data or {}, "succeeded", "INFO")
+
+    def _on_handshake_failed(self, data: dict | None = None) -> None:
+        self._emit_handshake_log(data or {}, "failed", "WARNING")
+
+    def _emit_handshake_log(self, data: dict, state: str, level: str) -> None:
+        peer_id = data.get("peer_id", "unknown peer")
+        address = data.get("ip")
+        port = data.get("port")
+        endpoint = f" ({address}:{port})" if address is not None and port is not None else ""
+        direction = data.get("direction", "peer")
+        message = f"Handshake {state} with {direction} peer {peer_id}{endpoint}"
+        reason = data.get("reason")
+        if reason:
+            message = f"{message}: {reason}"
+        self.sig_log_message.emit(level, message)

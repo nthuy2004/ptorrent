@@ -98,25 +98,69 @@ class PeerServer:
 
     def handle_client(self, sock: socket.socket, addr):
         file_id = None
+        peer_id = f"{addr[0]}:{addr[1]}"
+        handshake_started = False
+        handshake_succeeded = False
         try:
             sock.settimeout(15.0)
             msg_type, payload = Protocol.recv(sock)
             if msg_type != Protocol.MSG_HANDSHAKE:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": peer_id,
+                    "ip": addr[0],
+                    "port": addr[1],
+                    "direction": "incoming",
+                    "reason": f"expected handshake, received message type {msg_type}",
+                })
                 Protocol.send_error(sock, "handshake first.")
                 return
 
-            hs_data = Protocol.parse_handshake(payload)
+            handshake_started = True
+            bus.publish("peer.handshake.started", {
+                "peer_id": peer_id,
+                "ip": addr[0],
+                "port": addr[1],
+                "direction": "incoming",
+            })
+            try:
+                hs_data = Protocol.parse_handshake(payload)
+            except (ValueError, UnicodeError) as exc:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": peer_id,
+                    "ip": addr[0],
+                    "port": addr[1],
+                    "direction": "incoming",
+                    "reason": f"invalid handshake payload: {exc}",
+                })
+                Protocol.send_error(sock, "invalid handshake payload")
+                return
+
             file_id = hs_data.get("file_id")
+            peer_id = hs_data.get("peer_id") or peer_id
 
             with self._lock:
                 pm = self._piece_managers.get(file_id)
 
             if not pm:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": peer_id,
+                    "ip": addr[0],
+                    "port": addr[1],
+                    "direction": "incoming",
+                    "reason": f"unknown file ID: {file_id}",
+                })
                 Protocol.send_error(sock, f"pm is null: {file_id}")
                 return
 
             Protocol.send_handshake(sock, file_id, self.peer_id, is_ack=True)
             Protocol.send_bitfield(sock, pm.get_bitfield())
+            handshake_succeeded = True
+            bus.publish("peer.handshake.succeeded", {
+                "peer_id": peer_id,
+                "ip": addr[0],
+                "port": addr[1],
+                "direction": "incoming",
+            })
 
             with self._lock:
                 self._active_clients[file_id].append(sock)
@@ -137,8 +181,15 @@ class PeerServer:
                     Protocol.send_piece(sock, piece_index, piece_data)
                     pm.record_uploaded(len(piece_data))
 
-        except (ConnectionError, socket.timeout, OSError):
-            pass
+        except (ConnectionError, socket.timeout, OSError, ValueError) as exc:
+            if handshake_started and not handshake_succeeded:
+                bus.publish("peer.handshake.failed", {
+                    "peer_id": peer_id,
+                    "ip": addr[0],
+                    "port": addr[1],
+                    "direction": "incoming",
+                    "reason": str(exc) or exc.__class__.__name__,
+                })
         finally:
             if file_id:
                 with self._lock:

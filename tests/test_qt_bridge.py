@@ -71,6 +71,16 @@ def test_bridge_maps_task_and_peer_events(qapp):
         bus.publish("task.speed", {"file_id": "f1", "download_speed": 1.5, "upload_speed": 2})
         bus.publish("file.completed", {"file_id": "f1", "output_path": "out.bin"})
         bus.publish("peer.connected", {"peer_id": "peer-a", "ip": "127.0.0.1", "port": 6767})
+        bus.publish("peer.handshake.started", {
+            "peer_id": "peer-a", "ip": "127.0.0.1", "port": 6767, "direction": "outgoing"
+        })
+        bus.publish("peer.handshake.succeeded", {
+            "peer_id": "peer-a", "ip": "127.0.0.1", "port": 6767, "direction": "outgoing"
+        })
+        bus.publish("peer.handshake.failed", {
+            "peer_id": "peer-b", "ip": "127.0.0.2", "port": 6768,
+            "direction": "incoming", "reason": "unknown file ID"
+        })
 
         qapp.processEvents()
 
@@ -78,7 +88,12 @@ def test_bridge_maps_task_and_peer_events(qapp):
         assert progress == [("f1", 10, 20)]
         assert speeds == [("f1", 1.5, 2.0)]
         assert completed == [("f1", "out.bin")]
-        assert logs == [("INFO", "Peer peer-a (127.0.0.1:6767) connected")]
+        assert logs == [
+            ("INFO", "Peer peer-a (127.0.0.1:6767) connected"),
+            ("INFO", "Handshake started with outgoing peer peer-a (127.0.0.1:6767)"),
+            ("INFO", "Handshake succeeded with outgoing peer peer-a (127.0.0.1:6767)"),
+            ("WARNING", "Handshake failed with incoming peer peer-b (127.0.0.2:6768): unknown file ID"),
+        ]
     finally:
         bridge.close()
 
