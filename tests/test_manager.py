@@ -6,6 +6,7 @@ Chạy (tại thư mục gốc của dự án):
 """
 
 import os
+import socket
 import sys
 
 import pytest
@@ -14,7 +15,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 
 from client.core.chunker import Chunker
 from client.core.piece_manager import PieceManager
-from client.core.torrent_manager import TorrentTask
+from client.core.torrent_manager import TorrentManager, TorrentTask, normalize_tracker_url
 
 PIECE = 1024
 
@@ -110,3 +111,86 @@ def test_tasks_compare_by_identity_and_can_go_in_a_set(tmp_path):
     assert a == a
     assert a != b
     assert len({a, b, a}) == 2
+
+
+# --- TorrentManager ---
+def make_manager(tmp_path, name="storage"):
+    """Manager dùng cổng 0 để hệ điều hành tự chọn cổng trống."""
+    return TorrentManager(str(tmp_path / name), default_port=0, tracker_url="http://x")
+
+
+def test_manager_creates_its_folders(tmp_path):
+    m = make_manager(tmp_path)
+    assert os.path.isdir(m.storage_root)
+    assert os.path.isdir(os.path.join(m.storage_root, "torrents"))
+
+
+def test_peer_id_is_saved_and_reused(tmp_path):
+    first = make_manager(tmp_path)
+    second = make_manager(tmp_path)  # cùng thư mục lưu trữ = "mở lại app"
+    assert first.peer_id.startswith("PT-")
+    assert first.peer_id == second.peer_id
+
+
+def test_different_storage_gets_different_peer_id(tmp_path):
+    a = make_manager(tmp_path, "a")
+    b = make_manager(tmp_path, "b")
+    assert a.peer_id != b.peer_id
+
+
+def test_start_opens_a_port_and_stop_marks_it_stopped(tmp_path):
+    m = make_manager(tmp_path)
+    assert not m.is_running
+    m.start()
+    try:
+        assert m.is_running
+        assert m.port > 0
+        # kết nối được vào cổng vừa mở
+        with socket.create_connection(("127.0.0.1", m.port), timeout=2):
+            pass
+        m.start()  # gọi lần hai không gây lỗi
+    finally:
+        m.stop()
+    assert not m.is_running
+    m.stop()  # tắt lần hai không gây lỗi
+
+
+def test_two_managers_run_at_the_same_time_on_different_ports(tmp_path):
+    a = make_manager(tmp_path, "a")
+    b = make_manager(tmp_path, "b")
+    a.start()
+    b.start()
+    try:
+        assert a.port != b.port
+    finally:
+        a.stop()
+        b.stop()
+
+
+def test_no_tasks_at_first(tmp_path):
+    m = make_manager(tmp_path)
+    assert m.get_all_tasks() == []
+    assert m.get_task("khong-ton-tai") is None
+
+
+def test_get_all_tasks_returns_a_copy(tmp_path):
+    m = make_manager(tmp_path)
+    task = make_task(subdir(tmp_path, "t"), 1024)
+    m._tasks[task.file_id] = task  # tạm thêm thẳng; sau này dùng create_and_seed / add_torrent
+
+    tasks = m.get_all_tasks()
+    assert tasks == [task]
+    assert m.get_task(task.file_id) is task
+
+    tasks.clear()  # sửa bản sao không ảnh hưởng manager
+    assert m.get_all_tasks() == [task]
+
+
+@pytest.mark.parametrize("given", [
+    "http://x",
+    "http://x/",
+    "http://x/announce.php",
+    "  http://x/announce.php/  ",
+])
+def test_tracker_url_is_normalized(given):
+    assert normalize_tracker_url(given) == "http://x"
