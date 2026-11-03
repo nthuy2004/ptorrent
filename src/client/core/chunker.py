@@ -4,7 +4,7 @@ import json
 import hashlib
 from typing import List, Dict, Optional
 
-from utils.log import logger
+from client.utils.log import logger
 
 DEFAULT_PIECE_SIZE = 256 * 1024
 
