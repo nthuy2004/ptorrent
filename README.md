@@ -1,57 +1,57 @@
-# HOC VIEN CONG NGHE BUU CHINH VIEN THONG (PTIT)
-## KHOA CONG NGHE THONG TIN
-### BAI TAP LON MON HOC: HE THONG PHAN TAN (DISTRIBUTED SYSTEMS)
+# HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG (PTIT)
+## KHOA CÔNG NGHỆ THÔNG TIN
+### BÀI TẬP LỚN MÔN HỌC: HỆ THỐNG PHÂN TÁN (DISTRIBUTED SYSTEMS)
 
 ---
 
-# DE TAI DS02: HE THONG CHIA SE TEP NGANG HANG MO PHONG BITTORRENT
-# (P2P FILE-SHARING SYSTEM SIMULATING BITTORRENT)
+# ĐỀ TÀI: HỆ THỐNG CHIA SẺ TỆP NGANG HÀNG MÔ PHỎNG BITTORRENT (pTorrent)
+### (P2P FILE-SHARING SYSTEM SIMULATING BITTORRENT)
 
-- Repository: https://github.com/nthuy2004/ptorrent
-- Phien ban: v1.0.0
-- Nam hoc: 2026 - 2027
+- Kho mã nguồn: https://github.com/nthuy2004/ptorrent
+- Phiên bản: v1.0.0
+- Năm học: 2026 - 2027
 
 ---
 
-## 1. THONG TIN NHOM VA PHAN CONG NHIEM VU
+## 1. THÔNG TIN NHÓM VÀ PHÂN CÔNG NHIỆM VỤ
 
-Theo quy dinh tai Muc 2 va Muc 10.1 cua dac ta de tai, moi thanh vien chiu trach nhiem chinh cho mot thanh phan he thong va co lich su dong gop ro rang tren GitHub:
+Mỗi thành viên trong nhóm phụ trách một mảng kiến trúc cốt lõi của hệ thống và phối hợp liên tục qua kho mã nguồn GitHub:
 
-| STT | Ho va ten | Ma sinh vien | Vai tro | Nhiem vu chinh va Dong gop tren GitHub |
+| STT | Họ và tên | Mã sinh viên | Vai trò | Nhiệm vụ chính và Đóng góp |
 |:---:|:---|:---:|:---|:---|
-| 1 | Nguyễn Tiến Huy (Nhóm trưởng) | B23DCVT213 | Core Network & Tracker Lead | - Khoi tao kien truc base source, tai lieu dac ta.<br>- Giao thuc mang TCP nhi phan (protocol.py).<br>- Module Chunker (chia/ghep tep, SHA-256) va PieceManager.<br>- Tracker backend (PHP, MySQL) va Tracker client.<br>- Quan ly tich hop Git, review PRs va merge code. |
-| 2 | Lê Đăng Khoa | B23DCVT236 | Concurrency & Manager Lead | - Xay dung lop dieu phoi da tep TorrentManager va TorrentTask.<br>- Quan ly vong doi tac vu (create, add, pause, resume, remove).<br>- Co che Session Persistence (session.json) phuc vu Resume.<br>- Co che tinh toan bang thong (Speed Loop) va advertise_ip.<br>- Viet bo test tu dong tests/test_manager.py (50 test cases). |
-| 3 | Nguyễn Hữu Tuấn Minh | B23DCVT279 | Desktop GUI & Integration Lead | - Cau noi su kien da luong QtEventBridge (PyPubSub -> Qt Signals).<br>- Widget PieceGrid truc quan hoa Bitfield Grid bang QPainter.<br>- Cua so chinh MainWindow tich hop QThreadPool xu ly bat dong bo.<br>- Hop thoai CreateTorrentDialog va OpenTorrentDialog.<br>- Viet bo test kiem thu giao dien nguoi dung (GUI tests). |
+| 1 | Nguyễn Tiến Huy (Nhóm trưởng) | B23DCVT213 | Core Network & Tracker Lead | - Khởi tạo kiến trúc base source và tài liệu kỹ thuật.<br>- Giao thức mạng TCP nhị phân (protocol.py).<br>- Module Chunker (chia/ghép tệp, SHA-256) và PieceManager.<br>- Tracker backend (PHP, MySQL) và Tracker client.<br>- Quản lý tích hợp Git, review PR và điều phối merge code. |
+| 2 | Lê Đăng Khoa | B23DCVT236 | Concurrency & Manager Lead | - Xây dựng lớp điều phối đa tệp TorrentManager và TorrentTask.<br>- Quản lý vòng đời tác vụ (create, add, pause, resume, remove).<br>- Cơ chế Session Persistence (session.json) phục vụ tính năng Resume.<br>- Cơ chế đo lường băng thông (Speed Loop) và giới hạn tốc độ (Rate Limiter).<br>- Viết bộ kiểm thử tự động cho TorrentManager và luồng xử lý lỗi. |
+| 3 | Nguyễn Hữu Tuấn Minh | B23DCVT279 | Desktop GUI & Integration Lead | - Cầu nối sự kiện đa luồng QtEventBridge (PyPubSub -> Qt Signals).<br>- Widget PieceGrid trực quan hóa ma trận Bitfield bằng QPainter.<br>- Cửa sổ chính MainWindow tích hợp QThreadPool xử lý bất đồng bộ.<br>- Hộp thoại CreateTorrentDialog, OpenTorrentDialog, thanh trạng thái và tiến độ.<br>- Viết bộ kiểm thử giao diện người dùng và kiểm thử tích hợp. |
 
 ---
 
-## 2. TONG QUAN KIEN TRUC HE THONG
+## 2. TỔNG QUAN KIẾN TRÚC HỆ THỐNG
 
-He thong gom 2 phan tach biet theo dung nguyen ly He thong phan tan:
+Hệ thống được thiết kế theo mô hình lai (Hybrid P2P Architecture) gồm 2 thành phần độc lập:
 
 1. **Tracker Server (PHP + MySQL):**
-   - Dong vai tro la so danh ba trung gian (Central Registry / Swarm Coordinator).
-   - Chi quan ly metadata va danh sach IP:Port cua cac Peer dang online.
-   - Tuyet doi khong luu tru va khong trung chuyen du lieu tep tin goc.
+   - Đóng vai trò là sổ danh bạ trung tâm (Central Registry / Swarm Coordinator).
+   - Tiếp nhận thông tin đăng ký tệp và theo dõi trạng thái các Peer (heartbeat/announce).
+   - Chỉ quản lý danh bạ IP:Port và metadata, hoàn toàn không lưu trữ hay chuyển tiếp dữ liệu tệp tin.
 
 2. **Peer Node Client (Python 3 + PyQt6):**
-   - Vua dong vai tro TCP Server (lang nghe yeu cau upload), vua la TCP Client (tai song song tu nhieu nguon).
-   - Giao dien Desktop GUI hien thi danh sach torrent va truc quan hoa trang thai tung manh du lieu (Piece Grid).
+   - Hoạt động song song với tư cách TCP Server (lắng nghe yêu cầu tải lên) và TCP Client (kết nối tải về từ nhiều nguồn).
+   - Tích hợp giao diện đồ họa Desktop GUI trực quan, theo dõi tiến độ từng mảnh dữ liệu (Piece Grid) theo thời gian thực.
 
 ```
                  +---------------------------------------------+
                  |            TRACKER SERVER (PHP/MySQL)       |
-                 |     (Chi dieu phoi danh ba, khong giu tep)  |
+                 |     (Chỉ điều phối danh bạ, không giữ tệp)  |
                  +---------------------------------------------+
                            ^                         ^
             POST /register |                         | GET /announce
             POST /announce |                         |
                            v                         v
-       +-------------------------+         +-------------------------+
-       |   PEER A (SEEDER 100%)  |         |  PEER B (LEECHER -> 50%)|
-       | - PeerServer (Port 6881)|<=======>| - PeerServer (Port 6882)|
-       | - PieceManager (Seeding)|   TCP   | - Downloader (Worker)   |
-       +-------------------------+  Socket +-------------------------+
+        +-------------------------+         +-------------------------+
+        |   PEER A (SEEDER 100%)  |         |  PEER B (LEECHER -> 50%)|
+        | - PeerServer (Port 6881)|<=======>| - PeerServer (Port 6882)|
+        | - PieceManager (Seeding)|   TCP   | - Downloader (Worker)   |
+        +-------------------------+  Socket +-------------------------+
                     ^                                   ^
                     |          Direct P2P Transfer      |
                     +-----------------+-----------------+
@@ -60,180 +60,199 @@ He thong gom 2 phan tach biet theo dung nguyen ly He thong phan tan:
                          +-------------------------+
                          |  PEER C (LEECHER -> 20%)|
                          | - Downloader (Parallel) |
-                         | - Tai tu ca A va B      |
+                         | - Tải từ cả A và B      |
                          +-------------------------+
 ```
 
 ---
 
-## 3. CAC TINH NANG VA CO CHE PHAN TAN COT LOI
+## 3. CÁC TÍNH NĂNG VÀ CƠ CHẾ PHÂN TÁN CỐT LÕI
 
-- **Data Chunking & Hashing:** Tep duoc chia thanh cac manh co dinh (16 KiB - 2048 KiB). Moi manh duoc bam SHA-256 doc lap va toan bo tep co mot ma hash dai dien (file_id).
-- **Upload while Downloading:** Peer ngay khi tai va xac thuc thanh cong mot manh bat ky se lap tuc mo cong upload de phuc vu cac peer khac trong mang.
-- **Parallel Downloading:** Downloader su dung Worker Pool de ket noi dong thoi toi nhieu peer, tai cac chunk khac nhau song song.
-- **Piece Integrity Verification:** Moi chunk nhan ve duoc tinh lai SHA-256. Neu phat hien loi (Corrupted Piece), chunk bi huy bo va xep hang tai lai tu nguon khac.
-- **Fault Tolerance & Churn Handling:** Khi mot Peer nguon ngat ket noi dot ngot (Timeout), chunk dang tai do duoc tra ve hang doi va tu dong chuyen sang peer khac.
-- **Session Persistence & Resume:** Luu trang thai cac tac vu vao session.json. Khi khoi dong lai, ung dung tu dong scan cac chunk .dat tren dia va chi tai tiep phan con thieu.
-- **Thread-safe GUI:** Toan bo thao tac doc ghi dia va giao tiep mang duoc xu ly tren luong nen thong qua QThreadPool va EventBus (PyPubSub), dam bao giao dien khong bao gio bi treo (Not Responding).
+- **Phân mảnh dữ liệu và băm SHA-256 (Chunking & Hashing):** Tệp được chia thành các mảnh cố định (16 KiB - 2048 KiB). Mỗi mảnh được băm SHA-256 độc lập và toàn bộ tệp được định danh bằng một mã băm đại diện (file_id).
+- **Vừa tải vừa chia sẻ (Upload while Downloading):** Ngay khi một mảnh dữ liệu được tải về và xác thực tính toàn vẹn thành công, Peer lập tức mở cổng upload mảnh đó để phục vụ các peer khác trong mạng.
+- **Tải song song đa nguồn (Parallel Downloading):** Downloader sử dụng Worker Pool để kết nối đồng thời tới nhiều peer, yêu cầu các mảnh dữ liệu khác nhau song song nhằm tối ưu hóa băng thông.
+- **Xác thực toàn vẹn từng mảnh (Piece Integrity Verification):** Mọi mảnh nhận về đều được tính lại mã băm SHA-256. Nếu phát hiện sai lệch (Corrupted Chunk), mảnh đó bị hủy bỏ và tự động xếp hàng tải lại từ peer khác.
+- **Khả năng chịu lỗi và thích ứng biến động mạng (Fault Tolerance & Churn Handling):** Khi một Peer nguồn ngắt kết nối đột ngột hoặc quá thời gian chờ (Socket Timeout), mảnh dữ liệu đang tải dở sẽ được đưa trở lại hàng đợi và chuyển tiếp sang peer còn hoạt động.
+- **Lưu phiên làm việc và tiếp tục tải (Session Persistence & Resume):** Trạng thái các tác vụ được lưu vào tệp session.json. Khi khởi động lại, ứng dụng tự quét các chunk .dat trên đĩa và chỉ tải tiếp những phần còn thiếu mà không phải tải lại từ đầu.
+- **Giao diện đa luồng an toàn (Thread-safe GUI):** Toàn bộ thao tác I/O đọc ghi đĩa và truyền nhận mạng được tách biệt trên các luồng nền thông qua QThreadPool và cơ chế lắng nghe sự kiện EventBus (PyPubSub), đảm bảo giao diện luôn mượt mà.
+- **Điều tiết tốc độ và giả lập lỗi (Rate Limiter & Fault Injection):** Hỗ trợ giới hạn tốc độ truyền tải (Token Bucket) và giả lập tỷ lệ lỗi đường truyền nhằm kiểm nghiệm độ tin cậy của thuật toán tự phục hồi.
 
 ---
 
-## 4. CAU TRUC THU MUC DU AN
-
+## 4. CẤU TRÚC THƯ MỤC DỰ ÁN
 
 ```
 ptorrent/
-|-- README.md                     # Tai lieu tong quan, kien truc, phan cong, huong dan chay
-|-- requirements.txt              # Danh sach thu vien Python phu thuoc
-|-- DEBAI.pdf                     # Dac ta yeu cau bai tap lon PTIT
-|-- deploy/                       # Cau hinh dong goi va trien khai
-|   +-- .gitkeep
-|-- docs/                         # Bao cao ky thuat (report.pdf) va slide thuyet trinh
-|   +-- .gitkeep
-|-- scripts/                      # Script ho tro sinh file test, benchmark, failover
-|   +-- .gitkeep
-|-- tests/                        # Bo kiem thu tu dong (pytest)
-|   |-- test_chunker.py           # Kiem thu chia manh, bam SHA-256 va ghep tep
-|   |-- test_manager.py           # 50 test cases cho TorrentManager va TorrentTask
-|   |-- test_gui_main_window.py   # Kiem thu giao dien bang danh sach MainWindow
-|   |-- test_piece_grid.py        # Kiem thu PieceGrid widget
-|   |-- test_qt_bridge.py         # Kiem thu cau noi chuyen tiep tin hieu giua cac luong
-|   +-- test_peer_server.py       # Kiem thu PeerServer socket
+|-- README.md                     # Tài liệu tổng quan, kiến trúc, phân công và hướng dẫn sử dụng
+|-- requirements.txt              # Danh sách thư viện Python phụ thuộc
+|-- .env.example                  # Mẫu biến môi trường cấu hình hệ thống
+|-- deploy/                       # Cấu hình đóng gói và triển khai Tracker (Docker, SQL schema)
+|   |-- Dockerfile
+|   |-- docker-compose.yml
+|   |-- schema.sql
+|   +-- README.md
+|-- docs/                         # Báo cáo kỹ thuật và slide thuyết trình
+|-- scripts/                      # Script hỗ trợ sinh tệp kiểm thử, chạy nhanh demo và kiểm tra lỗi
+|   |-- generate_sample.py
+|   |-- run_demo_3peers.ps1
+|   |-- run_demo_3peers.bat
+|   |-- fault_injection_corrupt_chunk.py
+|   +-- demo_fault_scenarios.py
+|-- tests/                        # Bộ kiểm thử tự động (pytest)
+|   |-- test_chunker.py           # Kiểm thử chia mảnh, băm SHA-256 và ghép tệp
+|   |-- test_manager.py           # Kiểm thử TorrentManager và vòng đời TorrentTask
+|   |-- test_gui_main_window.py   # Kiểm thử giao diện danh sách tác vụ MainWindow
+|   |-- test_piece_grid.py        # Kiểm thử widget ma trận mảnh PieceGrid
+|   |-- test_qt_bridge.py         # Kiểm thử cầu nối tín hiệu giữa các luồng
+|   |-- test_peer_server.py       # Kiểm thử TCP PeerServer
+|   |-- test_fault_recovery.py    # Kiểm thử cơ chế phát hiện chunk lỗi và tự tải lại
+|   +-- test_rate_limiter_and_fault.py # Kiểm thử giới hạn băng thông và cơ chế mô phỏng lỗi
 +-- src/
     |-- tracker/                  # Backend Tracker Server (PHP + MySQL)
-    |   |-- database.php          # Ket noi PDO toi MySQL
-    |   |-- db.php                # Helpers xu ly request / response JSON
-    |   |-- register.php          # API tiep nhan dang ky metadata tep tu Seeder
-    |   +-- announce.php          # API tiep nhan heartbeat va tra ve danh sach Peer
-    +-- client/                   # Ma nguon Peer Client (Python 3 + PyQt6)
-        |-- main.py               # Diem khoi chay ung dung Desktop GUI
-        |-- core/                 # Engine xu ly mang va du lieu
-        |   |-- bus.py            # In-App EventBus su dung PyPubSub
-        |   |-- chunker.py        # Module Metadata, băm SHA-256, doc ghi tep
-        |   |-- protocol.py       # Giao thuc dong goi ban tin nhi phan TCP
-        |   |-- piece_manager.py  # Quan ly bitfield, luu tru chunk, resume
-        |   |-- peer_server.py    # TCP Server lang nghe yeu cau upload tu peer khac
-        |   |-- downloader.py     # Worker Pool tai song song va xu ly churn
-        |   |-- tracker.py        # HTTP Client giao tiep Tracker API
-        |   |-- torrent_manager.py# Lop dieu phoi tong the cac tac vu tai/seed
-        |   +-- qt_bridge.py      # Chuyen doi EventBus sang PyQt6 Signals
-        |-- gui/                  # Giao dien Desktop PyQt6
-        |   |-- app.py            # Ham bootstrap khoi dong QApplication
-        |   |-- main_window.py    # Cua so chinh, Toolbar, Table, Log panel
-        |   |-- piece_grid.py     # Widget ve ma tran mau Bitfield (QPainter)
-        |   +-- dialogs.py        # Hop thoai tao moi va mo tep metadata
+    |   |-- database.php          # Kết nối PDO tới MySQL
+    |   |-- db.php                # Tiện ích xử lý truy vấn và phản hồi JSON
+    |   |-- register.php          # API đăng ký thông tin tệp từ Seeder
+    |   +-- announce.php          # API điểm danh heartbeat và trả về danh sách Peer
+    +-- client/                   # Mã nguồn ứng dụng Client (Python 3 + PyQt6)
+        |-- main.py               # Điểm khởi chạy ứng dụng Desktop GUI
+        |-- config.py             # Cấu hình mặc định và quản lý tham số hệ thống
+        |-- core/                 # Khối xử lý mạng và truyền nhận dữ liệu
+        |   |-- bus.py            # EventBus nội bộ ứng dụng sử dụng PyPubSub
+        |   |-- chunker.py        # Module băm SHA-256, đọc ghi và phân mảnh tệp
+        |   |-- protocol.py       # Giao thức đóng gói bản tin nhị phân TCP
+        |   |-- piece_manager.py  # Quản lý bitfield, lưu trữ chunk và hỗ trợ resume
+        |   |-- peer_server.py    # TCP Server lắng nghe yêu cầu upload từ peer khác
+        |   |-- downloader.py     # Worker Pool tải song song và xử lý ngắt kết nối
+        |   |-- tracker.py        # HTTP Client giao tiếp với Tracker API
+        |   |-- torrent_manager.py# Bộ điều phối trung tâm các tác vụ tải và chia sẻ
+        |   |-- rate_limiter.py   # Thuật toán Token Bucket kiểm soát băng thông
+        |   +-- qt_bridge.py      # Chuyển đổi sự kiện EventBus sang PyQt6 Signals
+        |-- gui/                  # Giao diện người dùng Desktop PyQt6
+        |   |-- app.py            # Khởi động ứng dụng QApplication và nạp cấu hình
+        |   |-- main_window.py    # Cửa sổ chính, thanh công cụ, bảng tác vụ và log
+        |   |-- piece_grid.py     # Widget vẽ ma trận màu trực quan hóa Bitfield (QPainter)
+        |   +-- dialogs.py        # Các hộp thoại tạo tệp torrent và mở tệp chia sẻ
         +-- utils/
-            +-- log.py            # He thong Logger mau tren console
+            +-- log.py            # Hệ thống ghi log console màu
 ```
 
 ---
 
-## 5. YEU CAU HE THONG VA CAI DAT
+## 5. YÊU CẦU HỆ THỐNG VÀ CÀI ĐẶT
 
-### 5.1. Yeu cau moi truong
-- He dieu hanh: Windows 10/11, Linux, macOS.
-- Python: Phien ban >= 3.10.
+### 5.1. Yêu cầu môi trường
+- Hệ điều hành: Windows 10/11, Linux, macOS.
+- Python: Phiên bản >= 3.10.
 - Tracker Server:
-  - Tuy chon 1 (Mac dinh): Su dung Tracker truc tuyen da trien khai tai: `https://tracker.nth.id.vn`
-  - Tuy chon 2 (Cuc bo): PHP 8.x + MySQL (chay qua XAMPP hoac Docker).
+  - Tùy chọn 1 (Trực tuyến): Sử dụng Tracker có sẵn tại: `https://tracker.nth.id.vn`
+  - Tùy chọn 2 (Cục bộ): PHP 8.x + MySQL (triển khai qua Docker Compose trong thư mục deploy/ hoặc XAMPP).
 
-### 5.2. Cai dat moi truong Python
-Mo terminal tai thu muc goc cua du an:
+### 5.2. Cài đặt môi trường Python
+Mở terminal tại thư mục gốc của dự án:
 
 ```bash
-# 1. Tao moi truong ao (khuyen nghi)
+# 1. Tạo môi trường ảo (khuyến nghị)
 python -m venv venv
 
-# Kich hoat moi truong ao tren Windows:
+# Kích hoạt môi trường ảo trên Windows:
 venv\Scripts\activate
 
-# Kich hoat moi truong ao tren Linux/macOS:
+# Kích hoạt môi trường ảo trên Linux/macOS:
 source venv/bin/activate
 
-# 2. Cai dat cac goi phu thuoc
+# 2. Cài đặt các thư viện phụ thuộc
 pip install -r requirements.txt
 ```
 
 ---
 
-## 6. HUONG DAN VAN HANH (EXECUTION INSTRUCTIONS)
+## 6. HƯỚNG DẪN VẬN HÀNH
 
-### 6.1. Khoi chay ung dung giao dien Desktop (PyQt6 GUI)
+### 6.1. Khởi chạy ứng dụng giao diện Desktop (PyQt6 GUI)
 
-Chay lenh sau tai thu muc goc:
+Chạy lệnh sau tại thư mục gốc:
 
 ```bash
 python src/client/main.py
 ```
 
-Cac tham so dong lenh ho tro:
-- `--tracker-url`: Dia chi Tracker Server (mac dinh: `https://tracker.nth.id.vn`).
-- `--port`: Cong TCP lang nghe ket noi tu cac Peer khac (mac dinh: `6881`).
-- `--storage-root`: Thu muc luu tru du lieu session va cac chunk (mac dinh: `~/.ptorrent`).
+Các tham số dòng lệnh hỗ trợ:
+- `--tracker-url`: Địa chỉ Tracker Server (mặc định: `https://tracker.nth.id.vn`).
+- `--port`: Cổng TCP lắng nghe kết nối từ các Peer khác (mặc định: `6881`).
+- `--storage-root`: Thư mục lưu trữ dữ liệu session và các chunk (mặc định: `~/.ptorrent`).
+- `--rate-limit`: Giới hạn tốc độ tải xuống theo Byte/giây (mặc định: không giới hạn, ví dụ: `--rate-limit 524288` cho 512 KB/s).
+- `--fault-rate`: Tỷ lệ giả lập hỏng chunk khi truyền nhận (từ 0.0 đến 1.0, ví dụ: `--fault-rate 0.1` cho 10%).
 
-Vi du khoi chay Peer thu 2 tren cung mot may tinh (khac cong va khac thu muc luu tru):
+Ví dụ khởi chạy Peer thứ 2 trên cùng một máy tính (khác cổng và khác thư mục lưu trữ):
 
 ```bash
 python src/client/main.py --port 6882 --storage-root C:\temp\peer2
 ```
 
-### 6.2. Huong dan cac thao tac co ban tren giao dien
-1. **Chia se tep moi (Seeder):**
-   - Nhan nut **Create torrent** tren thanh cong cu.
-   - Chon tep nguon can chia se va kich thuoc chunk mong muon (mac dinh: 256 KiB).
-   - Nhan **OK**: He thong tu dong bam SHA-256, tao tep metadata `.ptorrent`, dang ky len Tracker va hien thi 100% tren Piece Grid.
-2. **Tai tep (Leecher):**
-   - Nhan nut **Open torrent** tren thanh cong cu.
-   - Chon tep metadata `.ptorrent` can tai.
-   - Nhan **Open**: He thong tu dong ket noi Tracker, lay danh sach peer va tien hanh tai song song.
-3. **Dieu khien tac vu:**
-   - Chon dong tep tren bang danh sach, su dung cac nut **Pause**, **Resume**, hoac **Remove**.
+Hoặc sử dụng script khởi động nhanh 3 Peer độc lập:
+```powershell
+.\scripts\run_demo_3peers.ps1
+```
+
+### 6.2. Hướng dẫn các thao tác cơ bản trên giao diện
+1. **Chia sẻ tệp mới (Seeder):**
+   - Nhấn nút **Create torrent** trên thanh công cụ.
+   - Chọn tệp nguồn cần chia sẻ và kích thước chunk mong muốn (mặc định: 256 KiB).
+   - Nhấn **OK**: Hệ thống tự động băm SHA-256, tạo tệp metadata `.ptorrent`, đăng ký lên Tracker và hiển thị 100% trên Piece Grid.
+2. **Tải tệp (Leecher):**
+   - Nhấn nút **Open torrent** trên thanh công cụ.
+   - Chọn tệp metadata `.ptorrent` cần tải và chọn thư mục đích lưu tệp hoàn chỉnh.
+   - Nhấn **Open**: Hệ thống tự động kết nối Tracker, lấy danh sách peer và tiến hành tải song song.
+3. **Điều khiển tác vụ:**
+   - Chọn dòng tệp trên bảng danh sách, sử dụng các nút **Pause**, **Resume**, hoặc **Remove**.
 
 ---
 
-## 7. CHAY BO KIEM THU TU DONG (AUTOMATED TESTS)
+## 7. BỘ KIỂM THỬ TỰ ĐỘNG (AUTOMATED TESTS)
 
-Du an co he thong kiem thu tu dong su dung `pytest`. Chay toan bo test suite bang lenh:
+Dự án tích hợp hệ thống kiểm thử tự động toàn diện với `pytest`. Chạy toàn bộ test suite bằng lệnh:
 
 ```bash
 pytest tests/ -v
 ```
 
-Ket qua kiem thu xac nhan toan bo 71 test cases deu vuot qua (Passed), bao gom:
-- Kiem thu logic cat/ghep tep va xac thuc ma bam (test_chunker.py).
-- Kiem thu xu ly vong doi TorrentManager, luu tru session, tinh toan bang thong (test_manager.py).
-- Kiem thu giao dien nguoi dung, ve ma tran mau Bitfield va chuyen tiep tin hieu da luong (test_gui_*.py, test_qt_bridge.py).
+Hệ thống kiểm thử xác nhận toàn bộ hơn 80 test cases đều vượt qua (Passed), bao gồm:
+- Kiểm thử logic phân mảnh, ghép tệp và xác thực mã băm SHA-256 (test_chunker.py).
+- Kiểm thử xử lý vòng đời TorrentManager, lưu trữ session, khôi phục tiến độ (test_manager.py).
+- Kiểm thử giao diện người dùng, vẽ ma trận PieceGrid và cầu nối tín hiệu đa luồng (test_gui_*.py, test_qt_bridge.py).
+- Kiểm thử cơ chế phát hiện chunk lỗi, hủy bỏ và tự động tải lại (test_fault_recovery.py).
+- Kiểm thử bộ điều tiết băng thông Token Bucket và mô phỏng lỗi (test_rate_limiter_and_fault.py).
 
 ---
 
-## 8. KICH BAN DEMO BAT BUOC TRUOC HOI DONG (7 MANDATORY SCENARIOS)
+## 8. CÁC KỊCH BẢN THỰC NGHIỆM VÀ DEMO HỆ THỐNG
 
-Theo quy dinh tai Muc 6.4 cua dac ta de tai:
+Dưới đây là các kịch bản kiểm thử nhằm minh họa toàn diện các đặc tính của hệ thống mạng ngang hàng:
 
-1. **Kich ban 1 - Tao metadata va chia se tep:**
-   - Mo Client 1 (Seeder). Nhan "Create torrent", chon tep video mau (vi du: 20 MB).
-   - Hien thi: Tep `.ptorrent` duoc sinh ra, Tracker Dashboard ghi nhan tep moi, bang Piece Grid cua Client 1 xanh toan bo 100%.
+1. **Kịch bản 1 - Tạo metadata và chia sẻ tệp ban đầu:**
+   - Khởi chạy Client 1 (Seeder). Nhấn "Create torrent", chọn tệp mẫu (ví dụ video hoặc tệp nén 20 MB).
+   - Kết quả: Tệp `.ptorrent` được sinh ra, Tracker Dashboard ghi nhận thông tin tệp mới, ma trận Piece Grid của Client 1 phủ màu xanh 100%.
 
-2. **Kich ban 2 - Tai song song tu it nhat 2 peers:**
-   - Khoi chay Seeder A (100%) va Seeder B (100%).
-   - Mo Client C (Leecher). Client C ket noi toi ca A va B, bang log the hien cac chunk duoc keo ve dong thoi tu ca 2 dia chi IP:Port khac nhau.
+2. **Kịch bản 2 - Tải song song từ nhiều nguồn (Parallel Downloading):**
+   - Khởi chạy Seeder A (100%) và Seeder B (100%).
+   - Mở Client C (Leecher). Client C kết nối đồng thời tới cả A và B, nhật ký log thể hiện các chunk được tải về song song từ cả hai địa chỉ IP:Port khác nhau.
 
-3. **Kich ban 3 - Vua tai vua chia se (Upload while downloading):**
-   - Seeder A co 100% tep. Client B bat dau tai tu A.
-   - Khi Client B moi tai duoc khoang 25% (10/40 chunks), bat Client C vao tai.
-   - Bang log cua Client B xuat hien: `[UPLOAD] Sent piece #x to Client C` ngay khi B chua tai xong tep.
+3. **Kịch bản 3 - Vừa tải vừa chia sẻ (Upload while downloading):**
+   - Seeder A nắm giữ 100% tệp. Client B bắt đầu tải từ A.
+   - Khi Client B mới chỉ tải được một phần (ví dụ 25%), mở Client C tham gia tải.
+   - Client B lập tức phục vụ các chunk đã xác thực cho Client C: log hiển thị `[UPLOAD] Sent piece #x to Client C` ngay khi B chưa tải xong tệp.
 
-4. **Kich ban 4 - Dung mot nguon khi dang tai (Fault Tolerance):**
-   - Client C dang tai tu Seeder A va Client B. Chu dong dong ung dung Seeder A dot ngot (Ctrl+C hoac tat cua so).
-   - Client C bat timeout socket, khong bi dung hinh hoac crash ung dung.
+4. **Kịch bản 4 - Xử lý ngắt kết nối đột ngột (Fault Tolerance):**
+   - Client C đang tải từ Seeder A và Client B. Chủ động tắt ứng dụng Seeder A đột ngột.
+   - Client C bắt sự kiện timeout, không bị treo ứng dụng và giữ nguyên các chunk đã hoàn thành.
 
-5. **Kich ban 5 - Tu dong chuyen sang nguon khac:**
-   - Tiep tuc tu Kich ban 4: Client C tu dong chuyen toan bo cac chunk con thieu sang tiep tuc yeu cau tu Client B va hoan thanh qua trinh tai.
+5. **Kịch bản 5 - Tự động chuyển đổi sang nguồn khác (Failover):**
+   - Nối tiếp Kịch bản 4: Client C tự động phân bổ lại các chunk còn thiếu sang Client B để tiếp tục tiến trình tải cho đến khi đạt 100%.
 
-6. **Kich ban 6 - Phat hien va xu ly chunk bi hong (Data Corruption):**
-   - Mo phong 1 chunk bi sai ma bam SHA-256 tren duong truyen.
-   - Tren giao dien: O vuong chunk do chuyen sang mau DO, log canh bao `CORRUPTED: Hash mismatch`. Chunk duoc tu dong yeu cau tai lai va chuyen thanh mau XANH.
+6. **Kịch bản 6 - Phát hiện và tự sửa lỗi chunk hỏng (Data Corruption Handling):**
+   - Mô phỏng một chunk bị sai lệch mã băm SHA-256 trên đường truyền hoặc bị can thiệp dữ liệu.
+   - Ứng dụng phát hiện bất thường: cảnh báo log `CORRUPTED: Hash mismatch`, ô mảnh dữ liệu trên Piece Grid hiển thị cảnh báo đỏ, sau đó chunk được hủy và tự động tải lại từ nguồn hợp lệ thành màu xanh.
 
-7. **Kich ban 7 - Ghep tep va xac thuc Hash cuoi cung:**
-   - Sau khi tai du 100% cac chunk, ung dung tu dong ghep thanh tep hoan chinh.
-   - So sanh SHA-256 cua tep dau ra voi tep ban dau: Khop 100%. Mo tep len kiem tra noi dung toan ven.
+7. **Kịch bản 7 - Ghép tệp và xác thực toàn vẹn cuối cùng:**
+   - Sau khi hoàn tất 100% các chunk, ứng dụng tự động lắp ghép thành tệp hoàn chỉnh tại thư mục đích.
+   - So sánh mã SHA-256 của tệp đầu ra với tệp gốc ban đầu: trùng khớp tuyệt đối, nội dung tệp nguyên vẹn.
