@@ -81,6 +81,9 @@ def test_window_populates_table_and_piece_grid(qapp):
         assert bar is not None
         assert bar.value() == 25
         assert bar.text() == "25.0%"
+        assert "Torrents: 1 (DL: 1, Seeding: 0)" in window.status_label_torrents.text()
+        assert "DL: 128 B/s | UL: 32 B/s" in window.status_label_speeds.text()
+        assert "Port:" in window.status_label_port.text()
     finally:
         window.close()
 

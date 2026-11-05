@@ -129,6 +129,18 @@ class MainWindow(QMainWindow):
         content.setStretchFactor(1, 3)
         self.setCentralWidget(content)
 
+        status_bar = self.statusBar()
+        self.status_label_torrents = QLabel("Torrents: 0 (DL: 0, Seeding: 0)")
+        self.status_label_speeds = QLabel("DL: 0.0 B/s | UL: 0.0 B/s")
+        port = getattr(self.manager, "port", None)
+        if port is None:
+            port = getattr(getattr(self.manager, "server", None), "port", "N/A")
+        self.status_label_port = QLabel(f"Port: {port}")
+        status_bar.addWidget(self.status_label_torrents)
+        status_bar.addWidget(QLabel(" | "))
+        status_bar.addWidget(self.status_label_speeds)
+        status_bar.addPermanentWidget(self.status_label_port)
+
     def _connect_bridge(self) -> None:
         self.bridge.sig_chunk_updated.connect(self._on_chunk_update)
         self.bridge.sig_progress_updated.connect(self._on_progress_update)
@@ -299,6 +311,8 @@ class MainWindow(QMainWindow):
             self.piece_grid.set_active_file("", 0, [])
             self._update_pieces_title()
 
+        self._update_status_bar(tasks)
+
     @pyqtSlot()
     def _on_selection_changed(self) -> None:
         file_id = self._selected_file_id()
@@ -361,6 +375,26 @@ class MainWindow(QMainWindow):
             bar.setValue(int(percent))
             bar.setFormat(f"{percent:.1f}%")
 
+    def _update_status_bar(self, tasks: list[Any] | None = None) -> None:
+        if tasks is None:
+            tasks = list(self._tasks_by_id.values())
+        total_dl = sum(getattr(task, "download_speed", 0.0) for task in tasks)
+        total_ul = sum(getattr(task, "upload_speed", 0.0) for task in tasks)
+        total_count = len(tasks)
+        seeding_count = sum(1 for task in tasks if getattr(task, "status", "") in ("completed", "seeding"))
+        downloading_count = sum(1 for task in tasks if getattr(task, "status", "") == "downloading")
+
+        self.status_label_torrents.setText(
+            f"Torrents: {total_count} (DL: {downloading_count}, Seeding: {seeding_count})"
+        )
+        self.status_label_speeds.setText(
+            f"DL: {self._format_speed(total_dl)} | UL: {self._format_speed(total_ul)}"
+        )
+        port = getattr(self.manager, "port", None)
+        if port is None:
+            port = getattr(getattr(self.manager, "server", None), "port", "N/A")
+        self.status_label_port.setText(f"Port: {port}")
+
     @pyqtSlot(str, float, float)
     def _on_speed_update(self, file_id: str, download_speed: float, upload_speed: float) -> None:
         row = self._row_by_id.get(file_id)
@@ -368,6 +402,11 @@ class MainWindow(QMainWindow):
             return
         self.torrent_table.item(row, 3).setText(self._format_speed(download_speed))
         self.torrent_table.item(row, 4).setText(self._format_speed(upload_speed))
+        task = self._tasks_by_id.get(file_id)
+        if task:
+            setattr(task, "download_speed", download_speed)
+            setattr(task, "upload_speed", upload_speed)
+        self._update_status_bar()
 
     @pyqtSlot(str, str)
     def _on_task_completed(self, file_id: str, output_path: str) -> None:
