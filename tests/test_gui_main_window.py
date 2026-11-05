@@ -47,8 +47,9 @@ class _FakeManager:
         assert file_id == "file-a"
         self.task.status = "paused"
 
-    def create_and_seed(self, file_path, piece_size):
+    def create_and_seed(self, file_path, piece_size, output_meta_path=None):
         self.create_args = (file_path, piece_size)
+        self.task.saved_meta_path = output_meta_path or "sample.ptorrent"
         return self.task
 
 
@@ -105,5 +106,30 @@ def test_manager_actions_run_in_background_with_arguments(qapp):
         )
         _wait_for(qapp, lambda: not window._workers)
         assert manager.create_args == ("source.bin", 256 * 1024)
+    finally:
+        window.close()
+
+
+def test_create_torrent_dialog_and_save_destination(qapp):
+    from client.gui.dialogs import CreateTorrentDialog
+    dialog = CreateTorrentDialog()
+    try:
+        dialog.path_edit.setText("D:/data/sample.iso")
+        assert dialog.file_path == "D:/data/sample.iso"
+        dialog.save_edit.setText("D:/out/my_torrent.ptorrent")
+        assert dialog.save_path == "D:/out/my_torrent.ptorrent"
+        dialog.save_edit.setText("D:/out/my_torrent")
+        assert dialog.save_path == "D:/out/my_torrent.ptorrent"
+    finally:
+        dialog.close()
+
+
+def test_torrent_created_dialog_presentation(qapp):
+    manager = _FakeManager()
+    window = MainWindow(manager)
+    try:
+        box = window._show_torrent_created_dialog("C:/test/file.ptorrent")
+        assert box.windowTitle() == "Torrent Created"
+        assert "C:\\test\\file.ptorrent" in box.informativeText() or "C:/test/file.ptorrent" in box.informativeText()
     finally:
         window.close()

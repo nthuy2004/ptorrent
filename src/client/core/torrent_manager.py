@@ -200,7 +200,12 @@ class TorrentManager:
         self._announce_stopped(tasks)
 
     # --- Tạo / thêm task ---
-    def create_and_seed(self, file_path: str, piece_size: int = DEFAULT_PIECE_SIZE) -> TorrentTask:
+    def create_and_seed(
+        self,
+        file_path: str,
+        piece_size: int = DEFAULT_PIECE_SIZE,
+        output_meta_path: Optional[str] = None,
+    ) -> TorrentTask:
         """Chia sẻ một file của mình: tạo .ptorrent, báo tracker, bắt đầu seed.
 
         Nếu file đã có trong danh sách thì trả về task cũ.
@@ -217,14 +222,30 @@ class TorrentManager:
             file_path, self.tracker_url + "/announce.php", piece_size)
         existing = self.get_task(metadata.file_id)
         if existing is not None:
+            if output_meta_path:
+                out_p = os.path.abspath(output_meta_path)
+                os.makedirs(os.path.dirname(out_p), exist_ok=True)
+                with open(out_p, "w", encoding="utf-8") as f:
+                    json.dump(metadata.to_dict(), f, indent=2, ensure_ascii=False)
+                existing.saved_meta_path = out_p
             return existing
 
         meta_path = self._save_meta(metadata)
+        if output_meta_path:
+            out_p = os.path.abspath(output_meta_path)
+            os.makedirs(os.path.dirname(out_p), exist_ok=True)
+            with open(out_p, "w", encoding="utf-8") as f:
+                json.dump(metadata.to_dict(), f, indent=2, ensure_ascii=False)
+            saved_path = out_p
+        else:
+            saved_path = meta_path
+
         # Tracker lỗi thì vẫn seed được (người khác thêm bằng file .ptorrent)
         if not self.tracker.register(metadata):
             logger.w(f"cannot register {metadata.file_name} on tracker, seeding anyway")
 
         task = self._make_task(metadata, meta_path, source_path=file_path)
+        task.saved_meta_path = saved_path
         with self._lock:
             self._tasks[task.file_id] = task
         self.save_session()

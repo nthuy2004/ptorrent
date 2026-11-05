@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from typing import Any, Callable
 
-from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal, pyqtSlot, Qt
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, QUrl, pyqtSignal, pyqtSlot, Qt
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
@@ -167,8 +171,42 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str, object)
     def _on_operation_finished(self, key: str, result: Any) -> None:
         self._workers.pop(key, None)
-        self._append_log("INFO", f"{key.split(':', 1)[0].replace('_', ' ').capitalize()} finished")
+        base_op = key.split(':', 1)[0]
+        self._append_log("INFO", f"{base_op.replace('_', ' ').capitalize()} finished")
         self.refresh_tasks()
+        if base_op == "create_and_seed" and result is not None:
+            saved_path = getattr(result, "saved_meta_path", getattr(result, "meta_path", None))
+            if saved_path:
+                self._show_torrent_created_dialog(saved_path)
+
+    def _show_torrent_created_dialog(self, meta_path: str) -> QMessageBox:
+        norm_path = os.path.normpath(os.path.abspath(meta_path))
+        box = QMessageBox(self)
+        box.setWindowTitle("Torrent Created")
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setText("Torrent metadata file created successfully.")
+        box.setInformativeText(norm_path)
+        open_button = box.addButton("Open Containing Folder", QMessageBox.ButtonRole.ActionRole)
+        box.addButton(QMessageBox.StandardButton.Ok)
+        if getattr(self, "_auto_dismiss_dialogs", False) or os.environ.get("PYTEST_CURRENT_TEST"):
+            return box
+        box.exec()
+        if box.clickedButton() == open_button:
+            self._open_in_file_manager(norm_path)
+        return box
+
+    def _open_in_file_manager(self, path: str) -> None:
+        folder = os.path.dirname(os.path.abspath(path))
+        if sys.platform == "win32":
+            try:
+                subprocess.Popen(f'explorer /select,"{os.path.normpath(path)}"')
+                return
+            except Exception:
+                pass
+        try:
+            os.startfile(folder)
+        except Exception:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(folder))
 
     @pyqtSlot(str, str)
     def _on_operation_failed(self, key: str, error: str) -> None:
@@ -184,6 +222,7 @@ class MainWindow(QMainWindow):
                 self.manager.create_and_seed,
                 dialog.file_path,
                 piece_size=dialog.piece_size,
+                output_meta_path=dialog.save_path,
             )
 
     def _open_torrent(self) -> None:
