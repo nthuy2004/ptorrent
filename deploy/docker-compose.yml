@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  tracker-db:
+    image: mysql:8.0
+    container_name: ptorrent-tracker-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret}
+      MYSQL_DATABASE: ${DB_NAME:-ptorrent}
+      MYSQL_USER: ${DB_USER:-ptorrent_user}
+      MYSQL_PASSWORD: ${DB_PASS:-ptorrent_secret}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - tracker_db_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_secret}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  tracker-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: ptorrent-tracker-api
+    restart: unless-stopped
+    depends_on:
+      tracker-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: tracker-db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-ptorrent}
+      DB_USER: ${DB_USER:-ptorrent_user}
+      DB_PASS: ${DB_PASS:-ptorrent_secret}
+    ports:
+      - "${TRACKER_PORT:-8080}:80"
+    volumes:
+      - ../src/tracker:/var/www/html
+
+volumes:
+  tracker_db_data:
+    driver: local
