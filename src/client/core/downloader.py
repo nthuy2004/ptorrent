@@ -4,6 +4,7 @@ import threading
 from typing import Optional, Callable
 from client.core.protocol import Protocol
 from client.core.piece_manager import PieceManager
+from client.core.rate_limiter import TokenBucketRateLimiter
 from client.core.bus import bus
 
 
@@ -14,17 +15,30 @@ class Downloader:
         piece_manager: PieceManager,
         max_workers: int = 4,
         socket_timeout: float = 5.0,
-        on_source_lost_callback: Optional[Callable[[], None]] = None
+        on_source_lost_callback: Optional[Callable[[], None]] = None,
+        download_limit: int = 0,
     ):
         self.peer_id = peer_id
         self.pm = piece_manager
         self.max_workers = max_workers
         self.socket_timeout = socket_timeout
         self.on_source_lost_callback = on_source_lost_callback
+        self.download_limit = download_limit
+        self.rate_limiter = TokenBucketRateLimiter(download_limit) if download_limit > 0 else None
 
         self._active_peers: set[tuple[str, int]] = set()
         self._lock = threading.Lock()
         self._running = False
+
+    def set_download_limit(self, limit_kib_s: int) -> None:
+        self.download_limit = limit_kib_s
+        if limit_kib_s > 0:
+            if not self.rate_limiter:
+                self.rate_limiter = TokenBucketRateLimiter(limit_kib_s)
+            else:
+                self.rate_limiter.set_limit(limit_kib_s)
+        else:
+            self.rate_limiter = None
 
     def start(self) -> None:
         self._running = True
@@ -171,6 +185,8 @@ class Downloader:
                             remote_bitfield[new_idx] = 1
                     elif m_type == Protocol.MSG_PIECE:
                         recv_idx, piece_data = Protocol.parse_piece(m_payload)
+                        if self.rate_limiter:
+                            self.rate_limiter.acquire(len(piece_data))
                         # Lưu và kiểm tra SHA-256
                         self.pm.save_and_verify_piece(recv_idx, piece_data, from_peer=peer_label)
                         current_piece = None
