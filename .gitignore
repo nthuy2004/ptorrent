@@ -28,3 +28,7 @@ completed/
 *.dat
 
 HUONG_DAN_NHIEM_VU_NHOM.md
+
+.coverage
+.coverage.*
+htmlcov/
