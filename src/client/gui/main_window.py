@@ -66,10 +66,10 @@ class MainWindow(QMainWindow):
         self._active_file_id: str | None = None
         self._pool = QThreadPool.globalInstance()
 
-        self.setWindowTitle("pTorrent")
         self.resize(1080, 720)
         self._build_ui()
         self._connect_bridge()
+        self._update_window_title()
 
         self._refresh_timer = QTimer(self)
         self._refresh_timer.setInterval(1000)
@@ -351,6 +351,7 @@ class MainWindow(QMainWindow):
             self._update_pieces_title()
 
         self._update_status_bar(tasks)
+        self._update_window_title()
 
     @pyqtSlot()
     def _on_selection_changed(self) -> None:
@@ -413,6 +414,39 @@ class MainWindow(QMainWindow):
         if isinstance(bar, QProgressBar):
             bar.setValue(int(percent))
             bar.setFormat(f"{percent:.1f}%")
+
+    def _get_display_ip(self) -> str:
+        adv = getattr(self.manager, "advertise_ip", None)
+        if adv:
+            return adv
+        server = getattr(self.manager, "server", None)
+        host = getattr(server, "host", None)
+        if host and host != "0.0.0.0":
+            return host
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except Exception:
+            return "127.0.0.1"
+
+    def _update_window_title(self) -> None:
+        peer_id = getattr(self.manager, "peer_id", None)
+        port = getattr(self.manager, "port", None)
+        if port is None:
+            port = getattr(getattr(self.manager, "server", None), "port", None)
+
+        if not peer_id and not port:
+            self.setWindowTitle("pTorrent")
+            return
+
+        ip = self._get_display_ip()
+        port_str = str(port) if port else "unknown"
+        peer_str = str(peer_id) if peer_id else "unknown"
+        self.setWindowTitle(f"pTorrent - {ip}:{port_str} | Peer ID: {peer_str}")
 
     def _update_status_bar(self, tasks: list[Any] | None = None) -> None:
         if tasks is None:

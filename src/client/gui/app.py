@@ -38,8 +38,7 @@ def build_manager(args: argparse.Namespace, manager_class: Callable[..., Any] | 
             from client.core.torrent_manager import TorrentManager
         except ImportError as exc:
             raise RuntimeError(
-                "TorrentManager is not available. Merge or add "
-                "src/client/core/torrent_manager.py before launching the real client."
+                "TorrentManager is not available."
             ) from exc
         manager_class = TorrentManager
 
@@ -55,7 +54,6 @@ def build_manager(args: argparse.Namespace, manager_class: Callable[..., Any] | 
 def run_gui(manager: Any, argv: list[str] | None = None) -> int:
     app = QApplication.instance() or QApplication([sys.argv[0]])
     app.setApplicationName("pTorrent")
-    app.setOrganizationName("DS02")
     window = MainWindow(manager)
     window.show()
     return app.exec()
