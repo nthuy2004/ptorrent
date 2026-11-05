@@ -23,7 +23,7 @@ from client.core.tracker import Tracker
 from client.utils.log import logger
 
 # Địa chỉ gốc của tracker (Tracker tự nối /announce.php), lấy theo main.py
-DEFAULT_TRACKER_URL = "https://nth.io.vn"
+DEFAULT_TRACKER_URL = "https://tracker.nth.id.vn"
 DEFAULT_PORT = 6881  # cổng chuẩn BitTorrent
 SESSION_FILE = "session.json"
 ADVERTISE_IP_ENV = "PTORRENT_ADVERTISE_IP"  # IP báo tracker thay cho IP tracker tự thấy

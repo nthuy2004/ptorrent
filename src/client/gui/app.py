@@ -20,7 +20,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--tracker-url",
-        default=os.environ.get("PTORRENT_TRACKER_URL", "https://nth.io.vn"),
+        default=os.environ.get("PTORRENT_TRACKER_URL", "https://tracker.nth.id.vn"),
         help="Tracker base URL, for example https://tracker.example.com",
     )
     parser.add_argument(
