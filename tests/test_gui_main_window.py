@@ -77,6 +77,10 @@ def test_window_populates_table_and_piece_grid(qapp):
             "pending",
         )
         assert window.pieces_title_label.text() == "Pieces: 1 / 4 (25.0%)"
+        bar = window.torrent_table.cellWidget(0, 2)
+        assert bar is not None
+        assert bar.value() == 25
+        assert bar.text() == "25.0%"
     finally:
         window.close()
 

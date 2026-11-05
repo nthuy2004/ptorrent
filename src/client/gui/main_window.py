@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QScrollArea,
     QSplitter,
     QTableWidget,
@@ -275,6 +276,20 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.ItemDataRole.UserRole, file_id)
                 self.torrent_table.setItem(row, column, item)
 
+            bar = self.torrent_table.cellWidget(row, 2)
+            if not isinstance(bar, QProgressBar):
+                bar = QProgressBar()
+                bar.setRange(0, 100)
+                bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                bar.setStyleSheet(
+                    "QProgressBar { border: 1px solid #c0c0c0; border-radius: 3px; "
+                    "text-align: center; background-color: #f0f0f0; font-size: 11px; } "
+                    "QProgressBar::chunk { background-color: #4caf50; border-radius: 2px; }"
+                )
+                self.torrent_table.setCellWidget(row, 2, bar)
+            bar.setValue(int(progress))
+            bar.setFormat(f"{progress:.1f}%")
+
         if selected_id in self._row_by_id:
             self.torrent_table.selectRow(self._row_by_id[selected_id])
         elif tasks:
@@ -338,7 +353,13 @@ class MainWindow(QMainWindow):
         if row is None:
             return
         percent = min(100.0, downloaded * 100.0 / total) if total else 0.0
-        self.torrent_table.item(row, 2).setText(f"{percent:.1f}%")
+        item = self.torrent_table.item(row, 2)
+        if item:
+            item.setText(f"{percent:.1f}%")
+        bar = self.torrent_table.cellWidget(row, 2)
+        if isinstance(bar, QProgressBar):
+            bar.setValue(int(percent))
+            bar.setFormat(f"{percent:.1f}%")
 
     @pyqtSlot(str, float, float)
     def _on_speed_update(self, file_id: str, download_speed: float, upload_speed: float) -> None:
