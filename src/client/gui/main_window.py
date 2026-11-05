@@ -107,7 +107,8 @@ class MainWindow(QMainWindow):
         grid_panel = QWidget(self)
         grid_layout = QVBoxLayout(grid_panel)
         grid_layout.setContentsMargins(0, 0, 0, 0)
-        grid_layout.addWidget(QLabel("Pieces", grid_panel))
+        self.pieces_title_label = QLabel("Pieces", grid_panel)
+        grid_layout.addWidget(self.pieces_title_label)
         grid_layout.addWidget(self.grid_scroll, 1)
 
         self.log_view = QTextEdit(self)
@@ -281,6 +282,7 @@ class MainWindow(QMainWindow):
         else:
             self._active_file_id = None
             self.piece_grid.set_active_file("", 0, [])
+            self._update_pieces_title()
 
     @pyqtSlot()
     def _on_selection_changed(self) -> None:
@@ -308,11 +310,27 @@ class MainWindow(QMainWindow):
             status = getattr(state, "name", str(state)).lower()
             if status in self.piece_grid.COLORS:
                 self.piece_grid.update_piece_status(file_id, index, status)
+        self._update_pieces_title()
 
     @pyqtSlot(str, int, str)
     def _on_chunk_update(self, file_id: str, index: int, status: str) -> None:
         self.piece_grid.update_piece_status(file_id, index, status)
+        if file_id == self._active_file_id:
+            self._update_pieces_title()
         self._append_log("INFO", f"Piece {index} {status} for {file_id[:12]}")
+
+    def _update_pieces_title(self) -> None:
+        if not self._active_file_id:
+            self.pieces_title_label.setText("Pieces")
+            return
+        statuses = self.piece_grid.piece_statuses
+        total = len(statuses)
+        if total == 0:
+            self.pieces_title_label.setText("Pieces")
+            return
+        completed = sum(1 for s in statuses if s == "completed")
+        percent = (completed / total * 100.0) if total > 0 else 0.0
+        self.pieces_title_label.setText(f"Pieces: {completed} / {total} ({percent:.1f}%)")
 
     @pyqtSlot(str, int, int)
     def _on_progress_update(self, file_id: str, downloaded: int, total: int) -> None:

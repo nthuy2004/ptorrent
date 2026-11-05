@@ -76,6 +76,7 @@ def test_window_populates_table_and_piece_grid(qapp):
             "pending",
             "pending",
         )
+        assert window.pieces_title_label.text() == "Pieces: 1 / 4 (25.0%)"
     finally:
         window.close()
 
