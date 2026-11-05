@@ -19,9 +19,9 @@ Theo quy dinh tai Muc 2 va Muc 10.1 cua dac ta de tai, moi thanh vien chiu trach
 
 | STT | Ho va ten | Ma sinh vien | Vai tro | Nhiem vu chinh va Dong gop tren GitHub |
 |:---:|:---|:---:|:---|:---|
-| 1 | Nguyen The Huy (Nhom truong) | B21DCCN387 | Core Network & Tracker Lead | - Khoi tao kien truc base source, tai lieu dac ta.<br>- Giao thuc mang TCP nhi phan (protocol.py).<br>- Module Chunker (chia/ghep tep, SHA-256) va PieceManager.<br>- Tracker backend (PHP, MySQL) va Tracker client.<br>- Quan ly tich hop Git, review PRs va merge code. |
-| 2 | Le Dang Khoa | B21DCCN450 | Concurrency & Manager Lead | - Xay dung lop dieu phoi da tep TorrentManager va TorrentTask.<br>- Quan ly vong doi tac vu (create, add, pause, resume, remove).<br>- Co che Session Persistence (session.json) phuc vu Resume.<br>- Co che tinh toan bang thong (Speed Loop) va advertise_ip.<br>- Viet bo test tu dong tests/test_manager.py (50 test cases). |
-| 3 | Nguyen Huu Tuan Minh | B21DCCN512 | Desktop GUI & Integration Lead | - Cau noi su kien da luong QtEventBridge (PyPubSub -> Qt Signals).<br>- Widget PieceGrid truc quan hoa Bitfield Grid bang QPainter.<br>- Cua so chinh MainWindow tich hop QThreadPool xu ly bat dong bo.<br>- Hop thoai CreateTorrentDialog va OpenTorrentDialog.<br>- Viet bo test kiem thu giao dien nguoi dung (GUI tests). |
+| 1 | Nguyễn Tiến Huy (Nhóm trưởng) | B23DCVT213 | Core Network & Tracker Lead | - Khoi tao kien truc base source, tai lieu dac ta.<br>- Giao thuc mang TCP nhi phan (protocol.py).<br>- Module Chunker (chia/ghep tep, SHA-256) va PieceManager.<br>- Tracker backend (PHP, MySQL) va Tracker client.<br>- Quan ly tich hop Git, review PRs va merge code. |
+| 2 | Lê Đăng Khoa | B23DCVT236 | Concurrency & Manager Lead | - Xay dung lop dieu phoi da tep TorrentManager va TorrentTask.<br>- Quan ly vong doi tac vu (create, add, pause, resume, remove).<br>- Co che Session Persistence (session.json) phuc vu Resume.<br>- Co che tinh toan bang thong (Speed Loop) va advertise_ip.<br>- Viet bo test tu dong tests/test_manager.py (50 test cases). |
+| 3 | Nguyễn Hữu Tuấn Minh | B23DCVT279 | Desktop GUI & Integration Lead | - Cau noi su kien da luong QtEventBridge (PyPubSub -> Qt Signals).<br>- Widget PieceGrid truc quan hoa Bitfield Grid bang QPainter.<br>- Cua so chinh MainWindow tich hop QThreadPool xu ly bat dong bo.<br>- Hop thoai CreateTorrentDialog va OpenTorrentDialog.<br>- Viet bo test kiem thu giao dien nguoi dung (GUI tests). |
 
 ---
 
@@ -80,7 +80,6 @@ He thong gom 2 phan tach biet theo dung nguyen ly He thong phan tan:
 
 ## 4. CAU TRUC THU MUC DU AN
 
-Tuan thu chuan muc Muc 10.1 trong dac ta mon hoc:
 
 ```
 ptorrent/
