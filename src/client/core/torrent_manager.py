@@ -19,6 +19,7 @@ from client.core.chunker import Chunker, Metadata, DEFAULT_PIECE_SIZE
 from client.core.downloader import Downloader
 from client.core.peer_server import PeerServer
 from client.core.piece_manager import PieceManager
+from client.config import DEFAULT_UPLOAD_LIMIT, DEFAULT_DOWNLOAD_LIMIT, DEFAULT_FAULT_RATE
 from client.core.tracker import Tracker
 from client.utils.log import logger
 
@@ -92,6 +93,9 @@ class TorrentManager:
         default_port: int = DEFAULT_PORT,
         tracker_url: str = DEFAULT_TRACKER_URL,
         advertise_ip: Optional[str] = None,
+        upload_limit: Optional[int] = None,
+        download_limit: Optional[int] = None,
+        fault_rate: Optional[float] = None,
     ):
         self.storage_root = os.path.abspath(storage_root)
         self.torrents_dir = os.path.join(self.storage_root, "torrents")
@@ -101,8 +105,18 @@ class TorrentManager:
         self.tracker = Tracker(self.tracker_url)
         self.advertise_ip = (advertise_ip or os.environ.get(ADVERTISE_IP_ENV, "")).strip() or None
 
+        self.upload_limit = DEFAULT_UPLOAD_LIMIT if upload_limit is None else upload_limit
+        self.download_limit = DEFAULT_DOWNLOAD_LIMIT if download_limit is None else download_limit
+        self.fault_rate = DEFAULT_FAULT_RATE if fault_rate is None else fault_rate
+
         self.peer_id = self._load_or_create_peer_id()
-        self.server = PeerServer(self.peer_id, "0.0.0.0", default_port)
+        self.server = PeerServer(
+            self.peer_id,
+            "0.0.0.0",
+            default_port,
+            upload_limit=self.upload_limit,
+            fault_rate=self.fault_rate,
+        )
 
         # file_id -> TorrentTask; luôn giữ self._lock khi truy cập
         self._tasks: Dict[str, TorrentTask] = {}
@@ -412,7 +426,11 @@ class TorrentManager:
             # Mất nguồn thì đánh thức vòng announce để tìm nguồn mới
             # (không announce ngay vì callback chạy trên thread tải)
             task.downloader = Downloader(
-                self.peer_id, pm, on_source_lost_callback=self._announce_now.set)
+                self.peer_id,
+                pm,
+                on_source_lost_callback=self._announce_now.set,
+                download_limit=self.download_limit,
+            )
         task.status = self._status_for(task)
         # Mốc đo tốc độ ban đầu, để phần đã tải dở không bị tính thành tốc độ
         task.downloaded_bytes_last_sec = pm.get_downloaded_bytes()

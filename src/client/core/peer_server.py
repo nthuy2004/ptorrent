@@ -1,17 +1,31 @@
+import random
 import socket
 import threading
 
 from client.core.protocol import Protocol
 from client.core.piece_manager import PieceManager
+from client.core.rate_limiter import TokenBucketRateLimiter
 from client.utils.log import logger
 from client.core.bus import bus
 
+
 class PeerServer:
-    def __init__(self, peer_id: str, host: str = "0.0.0.0", port: int = 6767):
+    def __init__(
+        self,
+        peer_id: str,
+        host: str = "0.0.0.0",
+        port: int = 6767,
+        upload_limit: int = 0,
+        fault_rate: float = 0.0,
+    ):
         self.peer_id = peer_id
         self.host = host
         self.port = port
-        self._server_socket: socket.socket = None
+        self.upload_limit = upload_limit
+        self.rate_limiter = TokenBucketRateLimiter(upload_limit) if upload_limit > 0 else None
+        self.fault_rate = max(0.0, min(1.0, float(fault_rate)))
+
+        self._server_socket: socket.socket | None = None
         self._running = False
 
         self._piece_managers: dict[str, PieceManager] = {}
@@ -19,6 +33,16 @@ class PeerServer:
         self._lock = threading.Lock()
 
         bus.subscribe("chunk.completed", self._on_local_chunk_completed)
+
+    def set_upload_limit(self, limit_kib_s: int) -> None:
+        self.upload_limit = limit_kib_s
+        if limit_kib_s > 0:
+            if not self.rate_limiter:
+                self.rate_limiter = TokenBucketRateLimiter(limit_kib_s)
+            else:
+                self.rate_limiter.set_limit(limit_kib_s)
+        else:
+            self.rate_limiter = None
 
     def _on_local_chunk_completed(self, data: dict) -> None:
         file_id = data.get("file_id")
@@ -70,22 +94,34 @@ class PeerServer:
         self._running = True
         self.init_socket()
 
-        accept_thread = threading.Thread(target=self.accept_loop_thread, daemon=True)
-        accept_thread.start()
+        self._thread = threading.Thread(target=self._listen, daemon=True)
+        self._thread.start()
 
     def stop(self):
         self._running = False
+        with self._lock:
+            for clients in self._active_clients.values():
+                for sock in clients:
+                    try:
+                        sock.shutdown(socket.SHUT_RDWR)
+                    except OSError:
+                        pass
+                    try:
+                        sock.close()
+                    except OSError:
+                        pass
+            self._active_clients.clear()
+
         if self._server_socket:
             try:
                 self._server_socket.close()
-            except Exception:
+            except OSError:
                 pass
 
-    def accept_loop_thread(self) -> None:
+    def _listen(self):
         while self._running:
             try:
                 client_sock, client_addr = self._server_socket.accept()
-                logger.d(f"Client {client_addr} accepted. sock={client_sock}")
                 t = threading.Thread(
                     target=self.handle_client,
                     args=(client_sock, client_addr),
@@ -178,7 +214,22 @@ class PeerServer:
                         Protocol.send_error(sock, f"piece {piece_index} is None")
                         continue
 
-                    Protocol.send_piece(sock, piece_index, piece_data)
+                    # Rate limiting before transmitting piece
+                    if self.rate_limiter:
+                        self.rate_limiter.acquire(len(piece_data))
+
+                    # Fault simulation: randomly corrupt piece payload
+                    send_data = piece_data
+                    if self.fault_rate > 0.0 and random.random() < self.fault_rate:
+                        corrupted = bytearray(piece_data)
+                        if corrupted:
+                            corrupted[0] ^= 0xFF
+                        send_data = bytes(corrupted)
+                        logger.w(
+                            f"Fault simulation: intentionally corrupted piece {piece_index} to peer {peer_id}"
+                        )
+
+                    Protocol.send_piece(sock, piece_index, send_data)
                     pm.record_uploaded(len(piece_data))
 
         except (ConnectionError, socket.timeout, OSError, ValueError) as exc:
@@ -197,5 +248,5 @@ class PeerServer:
                         self._active_clients[file_id].remove(sock)
             try:
                 sock.close()
-            except Exception:
+            except OSError:
                 pass
