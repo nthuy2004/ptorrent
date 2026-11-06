@@ -53,3 +53,26 @@ def test_build_manager_reports_missing_manager(monkeypatch):
 
     with pytest.raises(RuntimeError, match="TorrentManager is not available"):
         app.build_manager(args)
+
+
+def test_build_manager_passes_advertise_ip(tmp_path):
+    args = Namespace(
+        storage_root=str(tmp_path),
+        tracker_url="https://tracker.test",
+        port=6882,
+        advertise_ip="172.10.10.2",
+    )
+    manager = build_manager(args, _FakeManager)
+    assert manager.kwargs["advertise_ip"] == "172.10.10.2"
+
+
+def test_build_manager_auto_detects_advertise_ip(tmp_path):
+    args = Namespace(
+        storage_root=str(tmp_path),
+        tracker_url="https://tracker.test",
+        port=6882,
+        advertise_ip="auto",
+    )
+    manager = build_manager(args, _FakeManager)
+    assert "advertise_ip" in manager.kwargs
+    assert manager.kwargs["advertise_ip"] != ""
